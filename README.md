@@ -234,7 +234,7 @@ const doc = await wt.documents.create('./contract.pdf', {
 await wt.documents.retrieve(doc.id);
 ```
 
-PDF files must start with `%PDF-` and be at most 20 MB.
+PDF files must start with `%PDF-` and be at most 10 MB.
 
 ### Identity verifications and public verification
 

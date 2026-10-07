@@ -5,7 +5,7 @@ import { buildMultipart, buildPath, looksLikePdf, utf8 } from '../core/util.js';
 import type { Document, DocumentCreateParams } from '../types.js';
 import { ApiResource, paramsObject } from './base.js';
 
-const MAX_BYTES = 20 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
 const PARAM_KEYS = new Set(['kind', 'field_map', 'filename']);
 
 /** Minimal `Blob` shape (also matches `File`). */
@@ -28,7 +28,7 @@ export type FileInput = string | Uint8Array | ArrayBuffer | BlobLike | FileConte
 
 /** Uploaded PDF documents. */
 export class Documents extends ApiResource {
-  /** Uploads a PDF (at most 20 MB) with an optional field map. */
+  /** Uploads a PDF (at most 10 MB) with an optional field map. */
   async create(
     file: FileInput,
     params?: DocumentCreateParams,
@@ -43,7 +43,7 @@ export class Documents extends ApiResource {
     const content = read.content;
     let filename = read.filename;
     if (content.length > MAX_BYTES)
-      throw new InvalidArgumentError('The file is larger than the 20 MB limit.');
+      throw new InvalidArgumentError('The file is larger than the 10 MB limit.');
     if (!looksLikePdf(content)) throw new InvalidArgumentError('The file must be a PDF.');
 
     if (input['filename'] !== undefined) {

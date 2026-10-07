@@ -225,11 +225,11 @@ describe('document upload', () => {
   it('refuses invalid uploads before sending anything', async () => {
     const { wt, mock } = makeClient();
     const notPdf = new TextEncoder().encode('hello');
-    const huge = new Uint8Array(20 * 1024 * 1024 + 1);
+    const huge = new Uint8Array(10 * 1024 * 1024 + 1);
     huge.set(PDF_BYTES);
     const cases: [() => Promise<unknown>, RegExp][] = [
       [() => wt.documents.create(notPdf), /must be a PDF/],
-      [() => wt.documents.create(huge), /20 MB/],
+      [() => wt.documents.create(huge), /10 MB/],
       [() => wt.documents.create(join(dir, 'nope.pdf')), /does not exist/],
       [
         () => wt.documents.create(PDF_BYTES, { kind: 'pdf', title: 'x' } as never),
