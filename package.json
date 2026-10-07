@@ -1,0 +1,83 @@
+{
+  "name": "wthaiq",
+  "version": "1.0.0",
+  "description": "Official Node.js library for the Wthaiq e-signature API: signature requests, sessions, templates, embedded signing, evidence and webhooks.",
+  "keywords": [
+    "wthaiq",
+    "e-signature",
+    "esignature",
+    "electronic signature",
+    "digital signature",
+    "contracts",
+    "pades",
+    "webhooks",
+    "api",
+    "sdk"
+  ],
+  "homepage": "https://developers.wthaiq.com",
+  "bugs": {
+    "url": "https://github.com/wthaiq/wthaiq-node/issues",
+    "email": "support@wthaiq.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wthaiq/wthaiq-node.git"
+  },
+  "license": "MIT",
+  "author": "Wthaiq <support@wthaiq.com>",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/esm/**/*.js",
+    "dist/esm/**/*.d.ts",
+    "dist/esm/package.json",
+    "dist/cjs/**/*.js",
+    "dist/cjs/**/*.d.ts",
+    "dist/cjs/package.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "node scripts/clean.mjs dist && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/postbuild.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "pretest": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json",
+    "test": "node scripts/run-tests.mjs unit",
+    "test:integration": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json && node scripts/run-tests.mjs integration",
+    "test:dist": "node scripts/smoke-dist.mjs && node scripts/smoke-dist.cjs",
+    "prepack": "npm run build",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build && npm run test:dist"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^18.19.130",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.1"
+  }
+}

@@ -1,0 +1,7 @@
+dist/
+.test-dist/
+node_modules/
+coverage/
+package-lock.json
+test/fixtures/
+CHANGELOG.md

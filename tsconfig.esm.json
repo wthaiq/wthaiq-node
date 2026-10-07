@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist/esm",
+    "rootDir": "src",
+    "declaration": true,
+    "sourceMap": false,
+    "removeComments": false,
+    "stripInternal": true
+  },
+  "include": ["src"]
+}

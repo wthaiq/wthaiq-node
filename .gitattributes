@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.pdf binary
+/test export-ignore
+/examples export-ignore
+/scripts export-ignore
+/.github export-ignore
