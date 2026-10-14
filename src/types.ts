@@ -648,6 +648,8 @@ interface EventObjectMap {
   'signer.identity_in_review': SignerEventObject;
   'signer.identity_resubmission_requested': SignerEventObject;
   'signer.identity_declined': SignerEventObject;
+  'signer.identity_match_hold': SignerEventObject;
+  'signer.identity_match_decided': SignerEventObject;
   'signer.signed': SignerEventObject;
   'signer.declined': SignerEventObject;
   'document.sealed': SignatureRequest;

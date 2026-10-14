@@ -374,7 +374,9 @@ describe('resources', () => {
     const types = await wt.webhookEndpoints.eventTypes();
     assert.deepEqual(types, [...EVENT_TYPES]);
     assert.equal(path(mock.last), '/webhook_endpoints/event_types');
-    assert.equal(EVENT_TYPES.length, 19);
+    assert.equal(EVENT_TYPES.length, 21);
+    assert.equal(isEventType('signer.identity_match_hold'), true);
+    assert.equal(isEventType('signer.identity_match_decided'), true);
     assert.equal(isEventType('signer.signed'), true);
     assert.equal(isEventType('signer.unknown'), false);
     mock.push(json(200, { object: 'list' }));

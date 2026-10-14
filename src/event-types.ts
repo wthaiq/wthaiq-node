@@ -18,6 +18,8 @@ export const EVENT_TYPES = [
   'signer.identity_in_review',
   'signer.identity_resubmission_requested',
   'signer.identity_declined',
+  'signer.identity_match_hold',
+  'signer.identity_match_decided',
   'signer.signed',
   'signer.declined',
   'document.sealed',

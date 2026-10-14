@@ -5,6 +5,12 @@ All notable changes to this library are documented in this file. The project fol
 
 ## [Unreleased]
 
+### Added
+
+- Event types `signer.identity_match_hold` and `signer.identity_match_decided` in `EVENT_TYPES`, `isEventType()`
+  and the typed `WthaiqEvent` union: the name on the signer's identity document differs from the name in the
+  request, and the decision on that difference. `EVENT_TYPES` now lists 21 types.
+
 ## [1.0.0] - 2026-10-07
 
 First release, targeting API version `2026-07-01`.
