@@ -69,6 +69,7 @@ export interface RequestorConfig {
   maxRetries: number;
   apiVersion: string;
   userAgent: string;
+  language?: string | undefined;
   fetch: FetchLike | undefined;
   retryPolicy: RetryPolicy;
 }
@@ -178,6 +179,7 @@ export class Requestor {
       'Wthaiq-Version': this.config.apiVersion,
       Accept: spec.accept ?? 'application/json',
     };
+    if (this.config.language !== undefined) headers['Accept-Language'] = this.config.language;
     let body: string | Uint8Array | undefined;
     if (spec.body !== undefined) {
       body = spec.body.bytes;

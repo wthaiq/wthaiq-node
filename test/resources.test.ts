@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { EVENT_TYPES, isEventType, NotFoundError, type Wthaiq } from '../src/index.js';
+import { ConflictError, EVENT_TYPES, isEventType, NotFoundError, type Wthaiq } from '../src/index.js';
 import { apiError, json, list, makeClient, path, query, signatureRequest } from './helpers.js';
 
 interface Case {
@@ -221,6 +221,22 @@ const cases: Case[] = [
     status: 201,
   },
   {
+    name: 'signers.decideIdentityMatch',
+    call: (wt) => wt.signers.decideIdentityMatch('sgr_1', { decision: 'approve', note: 'Checked by phone' }),
+    method: 'POST',
+    path: '/signers/sgr_1/identity_match',
+    body: { decision: 'approve', note: 'Checked by phone' },
+    response: { id: 'sgr_1', object: 'signer' },
+  },
+  {
+    name: 'signers.decideIdentityMatch (reject)',
+    call: (wt) => wt.signers.decideIdentityMatch('sgr_1', { decision: 'reject' }),
+    method: 'POST',
+    path: '/signers/sgr_1/identity_match',
+    body: { decision: 'reject' },
+    response: { id: 'sgr_1', object: 'signer' },
+  },
+  {
     name: 'documents.retrieve',
     call: (wt) => wt.documents.retrieve('doc_1'),
     method: 'GET',
@@ -405,6 +421,95 @@ describe('resources', () => {
     mock.push(apiError(404, 'resource_missing'), json(404, '<html>not found</html>'));
     await assert.rejects(() => wt.verifications.retrieve('WTQ-X'), NotFoundError);
     await assert.rejects(() => wt.verifications.retrieve('WTQ-X'), NotFoundError);
+  });
+
+  it('returns found=false for a 404 not_found error envelope on verifications', async () => {
+    const { wt, mock } = makeClient();
+    mock.push(apiError(404, 'not_found'));
+    const verification = await wt.verifications.retrieve('WTQ-NOPE');
+    assert.deepEqual(JSON.parse(JSON.stringify(verification)), {
+      object: 'verification',
+      reference: 'WTQ-NOPE',
+      found: false,
+      status: 'not_found',
+      integrity: 'unknown',
+    });
+    assert.equal(verification.lastResponse.statusCode, 404);
+    assert.equal(verification.lastResponse.requestId, 'req_0123456789abcdef01');
+  });
+
+  it('decides an identity name match and returns the signer with name_match', async () => {
+    const { wt, mock } = makeClient();
+    const nameMatch = {
+      state: 'approved',
+      verdict: 'major',
+      expected_name: 'Noha Ahmed Ali',
+      document_name: 'Nuha Ahmad Aly',
+      document_type: 'Identity Card',
+      country: 'EGY',
+      id_last4: '1234',
+      decided_by: 'API',
+      decided_at: 1791353999,
+      deadline: 1791958089,
+    };
+    mock.push(
+      json(200, {
+        id: 'sgr_1',
+        object: 'signer',
+        require_identity: true,
+        identity: { status: 'approved', provider: 'external', level: 'aes', name_match: nameMatch },
+      }),
+    );
+    const signer = await wt.signers.decideIdentityMatch('sgr_1', { decision: 'approve' });
+    assert.equal(signer.identity?.name_match?.state, 'approved');
+    assert.equal(signer.identity?.name_match?.decided_by, 'API');
+    assert.deepEqual(signer.identity?.name_match, nameMatch);
+    assert.equal(mock.last.headers['Idempotency-Key']?.length, 36);
+  });
+
+  it('throws ConflictError when no name difference awaits a decision', async () => {
+    const { wt, mock } = makeClient();
+    mock.push(apiError(409, 'identity_match_not_pending', { param: 'decision' }));
+    await assert.rejects(
+      () => wt.signers.decideIdentityMatch('sgr_1', { decision: 'reject' }),
+      (error: unknown) =>
+        error instanceof ConflictError &&
+        error.code === 'identity_match_not_pending' &&
+        error.param === 'decision',
+    );
+  });
+
+  it('narrows identity name-match events to a signer with identity_match', async () => {
+    const { wt, mock } = makeClient();
+    mock.push(
+      json(200, {
+        id: 'evt_2',
+        object: 'event',
+        type: 'signer.identity_match_hold',
+        created_at: 1,
+        livemode: true,
+        data: {
+          object: {
+            id: 'sgr_1',
+            object: 'signer',
+            signature_request: 'sr_1',
+            identity_match: {
+              state: 'awaiting',
+              verdict: 'major',
+              expected_name: 'A B',
+              document_name: 'C D',
+            },
+          },
+        },
+      }),
+    );
+    const event = await wt.events.retrieve('evt_2');
+    if (event.type === 'signer.identity_match_hold') {
+      assert.equal(event.data.object.identity_match.state, 'awaiting');
+      assert.equal(event.data.object.signature_request, 'sr_1');
+    } else {
+      assert.fail('expected signer.identity_match_hold');
+    }
   });
 
   it('narrows webhook events by type', async () => {

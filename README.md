@@ -96,6 +96,7 @@ const wt = new Wthaiq('sk_test_...', {
   maxRetries: 2, // default 2 (3 attempts in total)
   apiVersion: '2026-07-01', // sent as Wthaiq-Version
   appInfo: { name: 'MyApp', version: '1.4.0', url: 'https://myapp.example' }, // appended to User-Agent
+  language: 'en', // error messages in English (sent as Accept-Language); default: no header, Arabic
   retryPolicy: { initialDelay: 500, maxDelay: 8000, maxRetryAfter: 60_000 }, // ms
   fetch: customFetch, // optional, see "Custom fetch"
 });
@@ -223,6 +224,22 @@ const redirect = await wt.signers.createSigningSession(signer.id, {
 });
 ```
 
+When the name on a signer's identity document differs from the name in the request, the signer's
+`identity.name_match` records it. With the account setting "hold signing until a decision" (the default), the
+`signer.identity_match_hold` event arrives, `identity.name_match.state` is `awaiting`, and signing waits for
+your decision (secret keys only):
+
+```js
+const decided = await wt.signers.decideIdentityMatch('sgr_…', {
+  decision: 'approve', // or 'reject' to stop this signer
+  note: 'Confirmed by phone', // optional, stored with the decision
+});
+decided.identity?.name_match?.state; // 'approved'
+```
+
+The decision triggers `signer.identity_match_decided`. Both events carry the signer and its `identity_match`.
+When nothing awaits a decision the call throws `ConflictError` with the code `identity_match_not_pending`.
+
 ### Documents
 
 ```js
@@ -245,6 +262,8 @@ const check = await wt.verifications.retrieve('WTQ-1A2B3C4D5E6F');
 if (!check.found) console.log('Unknown reference'); // a 404 lookup resolves with found: false
 ```
 
+`idv.name_match` holds the same name-match result as the signer's `identity.name_match`, or `null`.
+
 ### Webhook endpoints and events
 
 ```js
@@ -254,6 +273,7 @@ const endpoint = await wt.webhookEndpoints.create({
 });
 console.log(endpoint.secret); // whsec_… returned only now: store it
 
+for await (const item of wt.webhookEndpoints.list({ limit: 100 })) console.log(item.id, item.url); // every page
 await wt.webhookEndpoints.update(endpoint.id, { status: 'disabled' });
 await wt.webhookEndpoints.deliveries(endpoint.id); // last 50 attempts
 await wt.webhookEndpoints.test(endpoint.id); // synthetic signature_request.completed
@@ -312,14 +332,16 @@ pages, on an empty page, or if a cursor repeats.
 
 Every error thrown by the library extends `WthaiqError`. HTTP errors extend `ApiError` and carry `statusCode`,
 `code`, `param`, `type`, `requestId`, `error` (the raw error object), `headers` and `rawBody`. Branch on the
-class and on `code`; the `message` is human text (currently Arabic).
+class and on `code`; the `message` is human text, in Arabic unless the client option `language: 'en'` asks for
+English. Codes never change with the language.
 
 | Class                        | When                                                                                        |
 | ---------------------------- | ------------------------------------------------------------------------------------------- |
 | `ValidationError`            | 400: missing or invalid parameter (`param` names the field, `fieldErrors` maps it).         |
+| `TooManySignersError`        | 400 `too_many_signers`: more signers than `maxSigners` (5) in one request.                  |
 | `AuthenticationError`        | 401: missing, invalid or revoked key, inactive account.                                     |
 | `PaymentRequiredError`       | 402: `plan_required`, `plan_expired`, `insufficient_balance` (`upgradeUrl`).                |
-| `PermissionError`            | 403: `forbidden`, `plan_feature_unavailable` (`feature`, `requiredPlan`), `kyb_required`.   |
+| `PermissionError`            | 403: `forbidden`, `plan_feature_unavailable` (`upgradeUrl`), `kyb_required` (`verifyUrl`).  |
 | `NotFoundError`              | 404: unknown object, another account's object, or the other mode.                           |
 | `ConflictError`              | 409: idempotency conflicts, `request_not_cancelable`, `pdf_not_ready`, `workflow_not_live`. |
 | `RateLimitError`             | 429: `too_many_requests` (`retryAfter`) or quota codes such as `test_daily_limit`.          |
@@ -331,13 +353,26 @@ class and on `code`; the `message` is human text (currently Arabic).
 | `InvalidArgumentError`       | The library was called incorrectly; nothing was sent.                                       |
 
 ```js
-import { PermissionError, RateLimitError, ValidationError, WthaiqError } from 'wthaiq';
+import {
+  PaymentRequiredError,
+  PermissionError,
+  RateLimitError,
+  TooManySignersError,
+  ValidationError,
+  WthaiqError,
+} from 'wthaiq';
 
 try {
   await wt.signatureRequests.create(params);
 } catch (error) {
-  if (error instanceof ValidationError) {
+  if (error instanceof TooManySignersError) {
+    console.log(`At most ${error.maxSigners} signers per request: split them over several requests`);
+  } else if (error instanceof ValidationError) {
     console.log(`Fix ${error.param}: ${error.message}`);
+  } else if (error instanceof PaymentRequiredError) {
+    console.log(`Buy or renew a plan: ${error.upgradeUrl}`); // plan_required, plan_expired
+  } else if (error instanceof PermissionError && error.isKybRequired()) {
+    console.log(`Verify your company first: ${error.verifyUrl}`);
   } else if (error instanceof PermissionError && error.isPlanFeatureUnavailable()) {
     console.log(`Needs ${error.requiredPlan} for ${error.feature}: ${error.upgradeUrl}`);
   } else if (error instanceof RateLimitError) {

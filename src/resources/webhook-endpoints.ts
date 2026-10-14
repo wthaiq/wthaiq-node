@@ -58,13 +58,13 @@ export class WebhookEndpoints extends ApiResource {
     );
   }
 
-  /** The endpoints (newest first; the API returns a single page). */
-  list(params?: Pick<ListParams, 'limit'>, options?: RequestOptions): PagePromise<WebhookEndpoint> {
+  /** One page of endpoints (newest first). Iterate with `for await` to walk every page. */
+  list(params?: ListParams, options?: RequestOptions): PagePromise<WebhookEndpoint> {
     return this.listPage<WebhookEndpoint>('/webhook_endpoints', params, options);
   }
 
   /** Every endpoint. */
-  all(params?: Pick<ListParams, 'limit'>, options?: RequestOptions): AutoPager<WebhookEndpoint> {
+  all(params?: ListParams, options?: RequestOptions): AutoPager<WebhookEndpoint> {
     return this.autoPager<WebhookEndpoint>('/webhook_endpoints', params, options);
   }
 

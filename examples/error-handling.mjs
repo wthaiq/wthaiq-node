@@ -5,6 +5,7 @@ import {
   PaymentRequiredError,
   PermissionError,
   RateLimitError,
+  TooManySignersError,
   ValidationError,
   WthaiqError,
 } from 'wthaiq';
@@ -15,12 +16,18 @@ async function attempt(label, fn) {
     await fn();
     console.log(`${label}: ok`);
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof TooManySignersError) {
+      console.log(
+        `${label}: at most ${error.maxSigners} signers per request; split them over several requests`,
+      );
+    } else if (error instanceof ValidationError) {
       console.log(`${label}: invalid ${error.param ?? 'request'} (${error.code})`, error.fieldErrors);
     } else if (error instanceof AuthenticationError) {
       console.log(`${label}: check the API key (${error.code})`);
     } else if (error instanceof PaymentRequiredError) {
       console.log(`${label}: ${error.code}; buy or renew a plan at ${error.upgradeUrl}`);
+    } else if (error instanceof PermissionError && error.isKybRequired()) {
+      console.log(`${label}: verify your company first at ${error.verifyUrl}`);
     } else if (error instanceof PermissionError) {
       console.log(`${label}: not allowed (${error.code}) ${error.upgradeUrl ?? ''}`);
     } else if (error instanceof RateLimitError) {

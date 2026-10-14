@@ -4,7 +4,7 @@ export { Wthaiq };
 export default Wthaiq;
 
 export type { AppInfo, ClientConfig, ClientOptions } from './client.js';
-export { API_VERSION, DEFAULT_BASE_URL, PLANS_URL, VERIFY_URL, VERSION } from './version.js';
+export { API_VERSION, DEFAULT_BASE_URL, MAX_SIGNERS, PLANS_URL, VERIFY_URL, VERSION } from './version.js';
 export { ALL_EVENTS, EVENT_TYPES, isEventType } from './event-types.js';
 export type { EventType, SignatureRequestEventType, SignerEventType } from './event-types.js';
 export { Webhook, Webhooks } from './webhook.js';
@@ -23,6 +23,7 @@ export {
   RateLimitError,
   ServerError,
   SignatureVerificationError,
+  TooManySignersError,
   UnexpectedResponseError,
   ValidationError,
   WthaiqError,

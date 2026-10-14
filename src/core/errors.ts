@@ -1,4 +1,4 @@
-import { PLANS_URL, VERIFY_URL } from '../version.js';
+import { MAX_SIGNERS, PLANS_URL, VERIFY_URL } from '../version.js';
 
 /**
  * Base class of every error thrown by this library. Catch it to handle any failure from the SDK.
@@ -74,7 +74,7 @@ export interface ApiErrorInit {
 
 /**
  * The API answered with an HTTP error. Branch on `code` (machine readable), never on `message`
- * (human text, currently Arabic).
+ * (human text: Arabic by default, English with the client option `language: 'en'`).
  */
 export class ApiError extends WthaiqError {
   override name = 'ApiError';
@@ -128,6 +128,20 @@ export class ValidationError extends InvalidRequestError {
   }
 }
 
+/**
+ * 400 `too_many_signers`: a live signature request has more signers than allowed. Every signer of a live
+ * request counts as one send from the plan quota; split the signers over several requests.
+ */
+export class TooManySignersError extends ValidationError {
+  override name = 'TooManySignersError';
+
+  /** Most signers allowed in one request, from the error body (`max_signers`), else {@link MAX_SIGNERS}. */
+  get maxSigners(): number {
+    const value = this.error['max_signers'];
+    return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : MAX_SIGNERS;
+  }
+}
+
 /** 404: the object does not exist, belongs to another account, or is in the other mode (test vs live). */
 export class NotFoundError extends InvalidRequestError {
   override name = 'NotFoundError';
@@ -163,12 +177,22 @@ export class PermissionError extends ApiError {
     return stringField(this.error, 'required_plan');
   }
 
-  /** Where to upgrade the plan or verify the company. */
+  /**
+   * Where to upgrade the plan (`upgrade_url`). For `kyb_required` it returns {@link verifyUrl}, so that a
+   * single property always points to the page that unblocks the call.
+   */
   get upgradeUrl(): string | null {
     const url = stringField(this.error, 'upgrade_url');
     if (url !== null) return url;
-    if (this.isKybRequired()) return VERIFY_URL;
+    if (this.isKybRequired()) return this.verifyUrl;
     return this.isPlanFeatureUnavailable() ? PLANS_URL : null;
+  }
+
+  /** Where to verify the company (`verify_url`, with `kyb_required`), or null for other codes. */
+  get verifyUrl(): string | null {
+    const url = stringField(this.error, 'verify_url');
+    if (url !== null) return url;
+    return this.isKybRequired() ? VERIFY_URL : null;
   }
 
   isPlanFeatureUnavailable(): boolean {
@@ -184,6 +208,7 @@ export class PermissionError extends ApiError {
 export class PaymentRequiredError extends ApiError {
   override name = 'PaymentRequiredError';
 
+  /** Where to buy, renew or upgrade the plan (`upgrade_url`), else {@link PLANS_URL}. */
   get upgradeUrl(): string {
     return stringField(this.error, 'upgrade_url') ?? PLANS_URL;
   }
@@ -275,14 +300,17 @@ export function errorFromResponse(
     rawBody: body,
     headers,
   };
-  const ErrorClass = errorClassFor(statusCode);
+  const ErrorClass = errorClassFor(statusCode, init.code ?? null);
   return new ErrorClass(message, init);
 }
 
-function errorClassFor(status: number): new (message: string, init: ApiErrorInit) => ApiError {
+function errorClassFor(
+  status: number,
+  code: string | null,
+): new (message: string, init: ApiErrorInit) => ApiError {
   switch (status) {
     case 400:
-      return ValidationError;
+      return code === 'too_many_signers' ? TooManySignersError : ValidationError;
     case 401:
       return AuthenticationError;
     case 402:
@@ -317,6 +345,7 @@ export const errors = {
   ApiError,
   InvalidRequestError,
   ValidationError,
+  TooManySignersError,
   NotFoundError,
   ConflictError,
   AuthenticationError,

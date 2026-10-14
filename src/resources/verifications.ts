@@ -9,7 +9,8 @@ import { ApiResource } from './base.js';
 export class Verifications extends ApiResource {
   /**
    * Looks up a verification reference. An unknown reference resolves to an object with `found: false`
-   * (the API answers 404 with a verification body) instead of throwing.
+   * instead of throwing: the API answers 404, either with a verification body or with the error code
+   * `not_found`.
    */
   async retrieve(reference: string, options?: RequestOptions): Promise<WthaiqResponse<Verification>> {
     try {
@@ -32,6 +33,16 @@ export class Verifications extends ApiResource {
             decoded as unknown as Verification,
             new ResponseMeta(error.statusCode, { ...error.headers }),
           );
+        }
+        if (error.code === 'not_found') {
+          const missing: Verification = {
+            object: 'verification',
+            reference,
+            found: false,
+            status: 'not_found',
+            integrity: 'unknown',
+          };
+          return attachResponse(missing, new ResponseMeta(error.statusCode, { ...error.headers }));
         }
       }
       throw error;

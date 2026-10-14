@@ -151,6 +151,46 @@ export type IdentityReasonCode =
   | 'face_unclear'
   | 'not_accepted';
 
+/**
+ * Where the comparison between the name in the request and the name on the identity document stands:
+ * `not_compared` (no comparison possible), `auto_ok` (same or near-identical name), `awaiting` (different
+ * name, signing on hold until you decide), `recorded` (different name, logged without a hold), `approved` /
+ * `rejected` (decided), `expired` (not decided in time).
+ */
+export type NameMatchState =
+  'not_compared' | 'auto_ok' | 'awaiting' | 'recorded' | 'approved' | 'rejected' | 'expired';
+
+/** How far the two names differ: `match`, `minor` (one part differs), `major`, or `na` (not comparable). */
+export type NameMatchVerdict = 'na' | 'match' | 'minor' | 'major';
+
+/** The name-match result of a signer's identity verification. */
+export interface NameMatch {
+  state: NameMatchState | (string & {});
+  verdict: NameMatchVerdict | (string & {});
+  /** The signer name sent in the request. */
+  expected_name: string;
+  /** The name read from the identity document. */
+  document_name: string;
+  document_type: string;
+  /** Issuing country of the document. */
+  country: string;
+  /** Last four characters of the document number. */
+  id_last4: string;
+  /** Who decided (empty until a decision), e.g. `API`. */
+  decided_by: string;
+  decided_at: number | null;
+  /** Unix time after which an undecided hold expires. */
+  deadline: number;
+}
+
+/** Body of `signers.decideIdentityMatch`. */
+export interface IdentityMatchDecisionParams {
+  /** `approve` lets the signer finish signing; `reject` stops this signer. */
+  decision: 'approve' | 'reject';
+  /** Optional internal note stored with the decision (up to 200 characters). */
+  note?: string;
+}
+
 export interface SignerIdentity {
   status: IdentityStatus | (string & {});
   provider: string;
@@ -159,6 +199,8 @@ export interface SignerIdentity {
   reason_code: IdentityReasonCode | (string & {}) | null;
   updated_at: number | null;
   resubmit_steps?: string[];
+  /** The name-match result, or null when no comparison was recorded. Absent in test-mode simulations. */
+  name_match?: NameMatch | null;
 }
 
 export interface Signer {
@@ -188,6 +230,12 @@ export interface SignerEventObject extends Signer {
   workflow_id?: string;
   workflow_version?: number | null;
   vendor_data?: string;
+}
+
+/** `data.object` of `signer.identity_match_hold` and `signer.identity_match_decided`. */
+export interface SignerIdentityMatchEventObject extends SignerEventObject {
+  /** The name-match result that triggered the event. */
+  identity_match: NameMatch;
 }
 
 export type SignatureRequestStatus =
@@ -544,6 +592,8 @@ export interface IdentityVerification {
     'pending' | 'approved' | 'in_review' | 'resubmission_requested' | 'declined' | 'expired' | (string & {});
   level: LegalLevel | (string & {});
   verification_url: string | null;
+  /** The name-match result of this verification, or null. */
+  name_match?: NameMatch | null;
   created_at: number;
 }
 
@@ -648,8 +698,8 @@ interface EventObjectMap {
   'signer.identity_in_review': SignerEventObject;
   'signer.identity_resubmission_requested': SignerEventObject;
   'signer.identity_declined': SignerEventObject;
-  'signer.identity_match_hold': SignerEventObject;
-  'signer.identity_match_decided': SignerEventObject;
+  'signer.identity_match_hold': SignerIdentityMatchEventObject;
+  'signer.identity_match_decided': SignerIdentityMatchEventObject;
   'signer.signed': SignerEventObject;
   'signer.declined': SignerEventObject;
   'document.sealed': SignatureRequest;

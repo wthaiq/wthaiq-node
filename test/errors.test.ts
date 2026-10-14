@@ -5,12 +5,14 @@ import {
   AuthenticationError,
   ConflictError,
   InvalidRequestError,
+  MAX_SIGNERS,
   NotFoundError,
   PaymentRequiredError,
   PermissionError,
   PLANS_URL,
   RateLimitError,
   ServerError,
+  TooManySignersError,
   ValidationError,
   VERIFY_URL,
   WthaiqError,
@@ -152,6 +154,75 @@ describe('error mapping', () => {
     const notJson = await failWith(json(400, '{"error": "plain string"}'));
     assert.ok(notJson instanceof ValidationError);
     assert.deepEqual(notJson.error, {});
+  });
+
+  it('maps too_many_signers to TooManySignersError with the limit', async () => {
+    const error = await failWith(apiError(400, 'too_many_signers', { param: 'signers', max_signers: 5 }));
+    assert.ok(error instanceof TooManySignersError);
+    assert.ok(error instanceof ValidationError);
+    assert.ok(error instanceof InvalidRequestError);
+    assert.equal(error.name, 'TooManySignersError');
+    assert.equal(error.code, 'too_many_signers');
+    assert.equal(error.param, 'signers');
+    assert.equal(error.maxSigners, 5);
+    assert.deepEqual(error.fieldErrors, { signers: 'رسالة too_many_signers' });
+
+    const other = (await failWith(
+      apiError(400, 'too_many_signers', { max_signers: 3 }),
+    )) as TooManySignersError;
+    assert.equal(other.maxSigners, 3);
+    const missing = (await failWith(apiError(400, 'too_many_signers'))) as TooManySignersError;
+    assert.equal(missing.maxSigners, MAX_SIGNERS);
+    assert.equal(MAX_SIGNERS, 5);
+    const invalid = (await failWith(
+      apiError(400, 'too_many_signers', { max_signers: '5' }),
+    )) as TooManySignersError;
+    assert.equal(invalid.maxSigners, MAX_SIGNERS);
+
+    const plain = await failWith(apiError(400, 'test_signer_limit'));
+    assert.ok(plain instanceof ValidationError);
+    assert.ok(!(plain instanceof TooManySignersError));
+    assert.ok(!((await failWith(apiError(409, 'too_many_signers'))) instanceof TooManySignersError));
+  });
+
+  it('reads upgrade_url and verify_url sent by the API on plan and KYB errors', async () => {
+    const plansUrl = 'https://developers.wthaiq.com/plans';
+    const verifyUrl = 'https://developers.wthaiq.com/verify';
+    for (const code of ['plan_required', 'plan_expired']) {
+      const error = (await failWith(
+        apiError(402, code, { upgrade_url: `${plansUrl}?from=${code}` }),
+      )) as PaymentRequiredError;
+      assert.ok(error instanceof PaymentRequiredError);
+      assert.equal(error.upgradeUrl, `${plansUrl}?from=${code}`);
+    }
+
+    const kyb = (await failWith(
+      apiError(403, 'kyb_required', { verify_url: `${verifyUrl}?step=2` }),
+    )) as PermissionError;
+    assert.equal(kyb.isKybRequired(), true);
+    assert.equal(kyb.verifyUrl, `${verifyUrl}?step=2`);
+    assert.equal(
+      kyb.upgradeUrl,
+      `${verifyUrl}?step=2`,
+      'upgradeUrl points to the page that unblocks the call',
+    );
+
+    const kybDefault = (await failWith(apiError(403, 'kyb_required'))) as PermissionError;
+    assert.equal(kybDefault.verifyUrl, VERIFY_URL);
+
+    const feature = (await failWith(
+      apiError(403, 'plan_feature_unavailable', {
+        feature: 'embed',
+        required_plan: 'ap_biz',
+        upgrade_url: plansUrl,
+      }),
+    )) as PermissionError;
+    assert.equal(feature.upgradeUrl, plansUrl);
+    assert.equal(feature.verifyUrl, null);
+    assert.equal(feature.requiredPlan, 'ap_biz');
+
+    const forbidden = (await failWith(apiError(403, 'forbidden'))) as PermissionError;
+    assert.equal(forbidden.verifyUrl, null);
   });
 
   it('treats an unexpected redirect as an error', async () => {

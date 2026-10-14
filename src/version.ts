@@ -12,3 +12,6 @@ export const PLANS_URL = 'https://developers.wthaiq.com/plans';
 
 /** Page where the company verification required for live mode is completed. */
 export const VERIFY_URL = 'https://developers.wthaiq.com/verify';
+
+/** Most signers allowed in one live signature request (the `too_many_signers` limit). */
+export const MAX_SIGNERS = 5;

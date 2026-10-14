@@ -35,6 +35,12 @@ export interface ClientOptions {
   apiVersion?: string;
   /** Appended to the `User-Agent` header. */
   appInfo?: AppInfo;
+  /**
+   * Language of the API's human-readable error messages (`error.message`), sent as `Accept-Language`:
+   * `'en'` for English or `'ar'` for Arabic. When omitted no header is sent and the API answers in Arabic.
+   * Error codes never change with the language.
+   */
+  language?: string;
   /** A `fetch` implementation (for proxies, logging or tests). Default: the global `fetch`. */
   fetch?: FetchLike;
   /** Backoff settings, or a configured {@link RetryPolicy}. */
@@ -54,6 +60,7 @@ const OPTION_KEYS = new Set([
   'maxRetries',
   'apiVersion',
   'appInfo',
+  'language',
   'fetch',
   'retryPolicy',
 ]);
@@ -129,6 +136,13 @@ export class Wthaiq {
     if (typeof apiVersion !== 'string' || apiVersion === '') {
       throw new InvalidArgumentError('apiVersion must be a non-empty string.');
     }
+    const language = config['language'];
+    if (
+      language !== undefined &&
+      (typeof language !== 'string' || !/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(language))
+    ) {
+      throw new InvalidArgumentError("language must be a language tag such as 'en' or 'ar'.");
+    }
     const fetchFn = config['fetch'];
     if (fetchFn !== undefined && typeof fetchFn !== 'function') {
       throw new InvalidArgumentError('fetch must be a function compatible with the global fetch.');
@@ -147,6 +161,7 @@ export class Wthaiq {
       maxRetries,
       apiVersion,
       userAgent: userAgent(config['appInfo']),
+      language,
       fetch: fetchFn as FetchLike | undefined,
       retryPolicy,
     });

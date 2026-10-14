@@ -97,6 +97,24 @@ describe('pagination', () => {
     assert.equal(mock.requests.length, 1);
   });
 
+  it('walks every page of webhook endpoints with next_cursor', async () => {
+    const { wt, mock } = makeClient();
+    const we = (n: number): Record<string, unknown> => ({ id: `we_${n}`, object: 'webhook_endpoint' });
+    mock.push(json(200, list([we(3), we(2)], true, 'we_2')), json(200, list([we(1)], false, null)));
+    const endpoints = await wt.webhookEndpoints.all({ limit: 2 }).toArray();
+    assert.deepEqual(
+      endpoints.map((endpoint) => endpoint.id),
+      ['we_3', 'we_2', 'we_1'],
+    );
+    assert.deepEqual(query(mock.requests[0]!), { limit: '2' });
+    assert.deepEqual(query(mock.requests[1]!), { limit: '2', starting_after: 'we_2' });
+
+    mock.push(json(200, list([we(1)], false, null)));
+    const page = await wt.webhookEndpoints.list({ limit: 1, starting_after: 'we_2' });
+    assert.equal(page.hasNextPage(), false);
+    assert.deepEqual(query(mock.last), { limit: '1', starting_after: 'we_2' });
+  });
+
   it('all() returns an AutoPager that refetches on each iteration and honours a limit', async () => {
     const { wt, mock } = makeClient();
     mock.push(json(200, list([sr(3), sr(2)], true, 'sr_2')), json(200, list([sr(3), sr(2)], true, 'sr_2')));

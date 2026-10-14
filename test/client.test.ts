@@ -97,6 +97,9 @@ describe('client construction', () => {
       [TEST_KEY, { fetch: 'nope' }, /fetch/],
       [TEST_KEY, { retryPolicy: 3 }, /retryPolicy/],
       [TEST_KEY, { appInfo: { version: '1' } }, /appInfo/],
+      [TEST_KEY, { language: '' }, /language/],
+      [TEST_KEY, { language: 'en us' }, /language/],
+      [TEST_KEY, { language: 1 }, /language/],
       [TEST_KEY, { base_url: BASE }, /Unknown client option\(s\): base_url/],
     ];
     for (const [key, options, message] of bad) {
@@ -134,6 +137,35 @@ describe('default headers', () => {
     assert.equal(headers['Idempotency-Key'], undefined, 'GET requests carry no idempotency key');
     assert.equal(mock.last.method, 'GET');
     assert.equal(mock.last.url, `${BASE}/`);
+  });
+
+  it('sends no Accept-Language header by default (Arabic messages)', async () => {
+    const { wt, mock } = makeClient();
+    mock.push(json(200, { object: 'api_root' }));
+    await wt.account.retrieve();
+    assert.equal(mock.last.headers['Accept-Language'], undefined);
+  });
+
+  it('sends the language option as Accept-Language on every request', async () => {
+    const { wt, mock } = makeClient({ language: 'en' });
+    mock.push(json(200, { object: 'api_root' }), json(200, { id: 'sgr_1', object: 'signer' }));
+    await wt.account.retrieve();
+    assert.equal(mock.last.headers['Accept-Language'], 'en');
+    await wt.signers.decideIdentityMatch('sgr_1', { decision: 'approve' });
+    assert.equal(mock.last.headers['Accept-Language'], 'en');
+    const ar = makeClient({ language: 'ar' });
+    ar.mock.push(json(200, { object: 'api_root' }));
+    await ar.wt.account.retrieve();
+    assert.equal(ar.mock.last.headers['Accept-Language'], 'ar');
+    assert.equal(new Wthaiq({ apiKey: TEST_KEY, language: 'en-GB' }).isTestMode(), true);
+  });
+
+  it('lets a per-request header override the language option', async () => {
+    const { wt, mock } = makeClient({ language: 'en' });
+    mock.push(json(200, { object: 'api_root' }));
+    await wt.account.retrieve({ headers: { 'accept-language': 'ar' } });
+    assert.equal(mock.last.headers['Accept-Language'], undefined);
+    assert.equal(mock.last.headers['accept-language'], 'ar');
   });
 
   it('sends a custom API version', async () => {
