@@ -559,15 +559,6 @@ export interface DocumentFieldPlacement {
   signer?: number | string;
 }
 
-export interface DocumentCreateParams {
-  /** `pdf` (default) or `contract`. */
-  kind?: 'pdf' | 'contract';
-  /** Field placements (sent as a JSON string). */
-  field_map?: DocumentFieldPlacement[] | string;
-  /** File name sent with the upload (defaults to the file's own name or `document.pdf`). */
-  filename?: string;
-}
-
 export interface Document {
   id: string;
   object: 'document';

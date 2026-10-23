@@ -1,5 +1,5 @@
 /** Version of this library. */
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 /** Wthaiq API version this release targets (sent as the `Wthaiq-Version` header). */
 export const API_VERSION = '2026-07-01';

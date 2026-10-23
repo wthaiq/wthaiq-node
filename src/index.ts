@@ -43,7 +43,7 @@ export type {
   RequestOptions,
 } from './core/requestor.js';
 export type { AccountResource, BalanceResource, UsageResource } from './resources/account.js';
-export type { BlobLike, Documents, FileContent, FileInput } from './resources/documents.js';
+export type { Documents } from './resources/documents.js';
 export type { Events } from './resources/events.js';
 export type { Flows } from './resources/flows.js';
 export type { IdentityVerifications } from './resources/identity-verifications.js';

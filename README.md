@@ -242,16 +242,12 @@ When nothing awaits a decision the call throws `ConflictError` with the code `id
 
 ### Documents
 
-```js
-const doc = await wt.documents.create('./contract.pdf', {
-  kind: 'pdf',
-  field_map: [{ key: 'sig', type: 'signature', page: 1, x: 100, y: 650, w: 180, h: 50, signer: 1 }],
-});
-// Also accepted: a Buffer/Uint8Array/ArrayBuffer, a Blob or File, or { content, filename }.
-await wt.documents.retrieve(doc.id);
-```
+The API accepts contracts written as text only (in templates or in the request); PDF uploads are no longer accepted.
+Documents uploaded earlier can still be retrieved:
 
-PDF files must start with `%PDF-` and be at most 10 MB.
+```js
+await wt.documents.retrieve('doc_1');
+```
 
 ### Identity verifications and public verification
 

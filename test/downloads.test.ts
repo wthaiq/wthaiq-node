@@ -4,8 +4,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
-import { InvalidArgumentError, UnexpectedResponseError, ValidationError, WthaiqError } from '../src/index.js';
-import { apiError, json, makeClient, path, PDF_BYTES } from './helpers.js';
+import { UnexpectedResponseError, ValidationError, WthaiqError } from '../src/index.js';
+import { apiError, makeClient, path, PDF_BYTES } from './helpers.js';
 
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const dir = mkdtempSync(join(tmpdir(), 'wthaiq-node-'));
@@ -142,110 +142,5 @@ describe('final PDF download', () => {
     const bare = await wt.signatureRequests.downloadPdfStream('sr_1');
     assert.equal(bare.filename, null);
     assert.equal(bare.sha256, null);
-  });
-});
-
-describe('document upload', () => {
-  const docResponse = { id: 'doc_1', object: 'document', kind: 'pdf', filename: 'contract.pdf' };
-
-  function parseMultipart(request: { headers: Record<string, string>; body: unknown }): {
-    fields: Record<string, string>;
-    file: { name: string; filename: string; type: string; content: Buffer } | null;
-  } {
-    const type = request.headers['Content-Type'] ?? '';
-    const boundary = /boundary=(.+)$/.exec(type)?.[1];
-    assert.ok(boundary, 'multipart boundary');
-    assert.ok(request.body instanceof Uint8Array);
-    const raw = Buffer.from(request.body).toString('latin1');
-    assert.ok(raw.endsWith(`--${boundary}--\r\n`));
-    const fields: Record<string, string> = {};
-    let file = null;
-    for (const part of raw.split(`--${boundary}`).slice(1, -1)) {
-      const [head = '', ...rest] = part.slice(2).split('\r\n\r\n');
-      const content = rest.join('\r\n\r\n').slice(0, -2);
-      const name = /name="([^"]+)"/.exec(head)?.[1] ?? '';
-      const filename = /filename="([^"]*)"/.exec(head)?.[1];
-      if (filename === undefined) fields[name] = Buffer.from(content, 'latin1').toString('utf8');
-      else
-        file = {
-          name,
-          filename,
-          type: /Content-Type: (.+)/.exec(head)?.[1] ?? '',
-          content: Buffer.from(content, 'latin1'),
-        };
-    }
-    return { fields, file };
-  }
-
-  it('uploads a file path with kind and field map', async () => {
-    const { wt, mock } = makeClient();
-    mock.push(json(201, docResponse));
-    const file = join(dir, 'contract.pdf');
-    writeFileSync(file, PDF_BYTES);
-    const fieldMap = [
-      { key: 'sig', type: 'signature' as const, page: 1, x: 10, y: 20, w: 100, h: 40, signer: 1 },
-    ];
-    const doc = await wt.documents.create(file, { kind: 'contract', field_map: fieldMap });
-    assert.equal(doc.id, 'doc_1');
-    assert.equal(mock.last.method, 'POST');
-    assert.equal(path(mock.last), '/documents');
-    assert.ok(mock.last.headers['Idempotency-Key']);
-    const { fields, file: part } = parseMultipart(mock.last);
-    assert.deepEqual(fields, { kind: 'contract', field_map: JSON.stringify(fieldMap) });
-    assert.ok(part);
-    assert.equal(part.name, 'file');
-    assert.equal(part.filename, 'contract.pdf');
-    assert.equal(part.type, 'application/pdf');
-    assert.deepEqual(new Uint8Array(part.content), PDF_BYTES);
-  });
-
-  it('uploads bytes, ArrayBuffers, Blobs and { content, filename }', async () => {
-    const { wt, mock } = makeClient();
-    const inputs: [Parameters<typeof wt.documents.create>[0], string][] = [
-      [Buffer.from(PDF_BYTES), 'document.pdf'],
-      [PDF_BYTES.slice().buffer, 'document.pdf'],
-      [new Blob([PDF_BYTES]), 'document.pdf'],
-      [{ content: PDF_BYTES, filename: 'عقد "خاص".pdf' }, 'عقد \\"خاص\\".pdf'],
-      [{ content: new Blob([PDF_BYTES]) }, 'document.pdf'],
-      [{ content: new TextDecoder('latin1').decode(PDF_BYTES), filename: 'text.pdf' }, 'text.pdf'],
-    ];
-    for (const [input, expected] of inputs) {
-      mock.push(json(201, docResponse));
-      await wt.documents.create(input);
-      const raw = Buffer.from(mock.last.body as Uint8Array).toString('utf8');
-      assert.ok(raw.includes(`filename="${expected}"`), expected);
-    }
-    mock.push(json(201, docResponse));
-    await wt.documents.create(PDF_BYTES, { filename: 'override.pdf', field_map: '[]' });
-    const { fields, file } = parseMultipart(mock.last);
-    assert.equal(file?.filename, 'override.pdf');
-    assert.deepEqual(fields, { field_map: '[]' });
-  });
-
-  it('refuses invalid uploads before sending anything', async () => {
-    const { wt, mock } = makeClient();
-    const notPdf = new TextEncoder().encode('hello');
-    const huge = new Uint8Array(10 * 1024 * 1024 + 1);
-    huge.set(PDF_BYTES);
-    const cases: [() => Promise<unknown>, RegExp][] = [
-      [() => wt.documents.create(notPdf), /must be a PDF/],
-      [() => wt.documents.create(huge), /10 MB/],
-      [() => wt.documents.create(join(dir, 'nope.pdf')), /does not exist/],
-      [
-        () => wt.documents.create(PDF_BYTES, { kind: 'pdf', title: 'x' } as never),
-        /Unknown document parameter\(s\): title/,
-      ],
-      [() => wt.documents.create(PDF_BYTES, { filename: '' }), /filename/],
-      [() => wt.documents.create(PDF_BYTES, { kind: 3 } as never), /kind/],
-      [() => wt.documents.create(PDF_BYTES, { field_map: 5 } as never), /field_map/],
-      [() => wt.documents.create(42 as never), /must be a path/],
-    ];
-    for (const [call, message] of cases) {
-      await assert.rejects(
-        call,
-        (error: unknown) => error instanceof InvalidArgumentError && message.test(error.message),
-      );
-    }
-    assert.equal(mock.requests.length, 0);
   });
 });

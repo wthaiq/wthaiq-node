@@ -3,6 +3,12 @@
 All notable changes to this library are documented in this file. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-23
+
+### Removed
+
+- `documents.create()` — the API no longer accepts PDF uploads; write contracts as text in templates or the request.
+
 ## [1.0.0] - 2026-10-14
 
 First release, targeting API version `2026-07-01`.

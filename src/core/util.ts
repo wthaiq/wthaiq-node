@@ -96,48 +96,6 @@ export function buildPath(strings: TemplateStringsArray, ...ids: unknown[]): str
   return out;
 }
 
-/** A file part for {@link buildMultipart}. @internal */
-export interface MultipartFile {
-  filename: string;
-  contentType: string;
-  content: Uint8Array;
-}
-
-/** Builds a `multipart/form-data` body as bytes, so any fetch implementation can send (and resend) it. @internal */
-export async function buildMultipart(
-  fields: Record<string, string>,
-  files: Record<string, MultipartFile>,
-): Promise<{ body: Uint8Array; contentType: string }> {
-  const boundary = `----wthaiq${(await uuidV4()).replace(/-/g, '')}`;
-  const parts: Uint8Array[] = [];
-  for (const [name, value] of Object.entries(fields)) {
-    parts.push(
-      utf8.encode(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${quote(name)}"\r\n\r\n${value}\r\n`,
-      ),
-    );
-  }
-  for (const [name, file] of Object.entries(files)) {
-    parts.push(
-      utf8.encode(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${quote(name)}"; filename="${quote(file.filename)}"\r\n` +
-          `Content-Type: ${file.contentType}\r\n\r\n`,
-      ),
-      file.content,
-      utf8.encode('\r\n'),
-    );
-  }
-  parts.push(utf8.encode(`--${boundary}--\r\n`));
-  return { body: concatBytes(parts), contentType: `multipart/form-data; boundary=${boundary}` };
-}
-
-function quote(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/[\r\n]/g, '');
-}
-
 /** @internal */
 export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
   const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
