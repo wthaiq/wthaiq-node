@@ -1,6 +1,6 @@
 {
   "name": "wthaiq",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Official Node.js library for the Wthaiq e-signature API: signature requests, sessions, templates, embedded signing, evidence and webhooks.",
   "keywords": [
     "wthaiq",

@@ -3,6 +3,12 @@
 All notable changes to this library are documented in this file. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-10-23
+
+### Changed
+
+- Releases are published from GitHub Actions through npm trusted publishing again. No code changes.
+
 ## [1.1.0] - 2026-10-23
 
 ### Removed
